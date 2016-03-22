@@ -1,7 +1,8 @@
-import csv
+import sys
 import pandas
 import os
-
+import sqlite3
+import re
 
 class PrecintData:
 
@@ -11,9 +12,17 @@ class PrecintData:
         self.f_list = os.listdir(self.directory)
         self.data = []
 
+        self.cnxn = sqlite3.connect("ElectionResults")
+        self.cn = self.cnxn.cursor()
+
+    def create_election_table(self):
+
+        self.cn.execute("CREATE TABLE ElectionData (State TEXT, Year INTEGER, PresidentialTotal INTEGER, "
+                        "")
+
     def read_data(self):
 
-        data = []
+        all_data = pandas.DataFrame()
 
         for f in self.f_list:
 
@@ -21,11 +30,13 @@ class PrecintData:
 
             if f[:2] == "AK":
 
-                self.read_alaska(df)
+                print(self.read_alaska(df).columns)
+
+        print(all_data)
 
     def read_alaska(self, df):
 
-        if "ed_precint" not in df.columns and "precinct_code" not in df.columns:
+        if "ed_precinct" not in df.columns and "precinct_code" not in df.columns:
 
             df["precinct_code"] = df["precinct"].str.extract(r"(\d+\-\d+)")
             df2 = pandas.DataFrame(df.precinct.str.extract(r"(?<=District\s)(\d\d*)"), columns=["Index", "precinct"])
@@ -36,7 +47,30 @@ class PrecintData:
 
             df.loc[df.precinct_code.isnull(), "precinct_code"] = df.district
             df.drop("district", axis=1, inplace=True)
-            print(df.head(10))
+
+        else:
+
+            df["precinct_code"] = df["precinct"]
+            try:
+                df.drop(["precinct"], axis=1, inplace=True)
+            except ValueError:
+                pass
+
+            try:
+                df.drop(["ed"], axis=1, inplace=True)
+            except ValueError:
+                pass
+
+            try:
+                df.drop(["ed_precinct"], inplace=True)
+            except ValueError:
+                pass
+
+        final_df = df[df.columns[df.columns.to_series().str.contains(r"state|year|_USP_|_USH_|_STS_|_STH_|_GOV_|_USS_|_USH_|precinct|precinct_code")]]
+
+        final_df.columns = final_df.columns.str.replace("\d+", "")
+
+        return final_df
 
 
 
